@@ -30,13 +30,34 @@ TxContract MyToken(owner: Address, mut remain: U256) {
 
 ```shell
 $ curl -X 'POST' \
-  'http://127.0.0.1:12973/contracts/compile' \
+  'http://127.0.0.1:12973/contracts/compile-contract' \
   -H 'accept: application/json' \
   -H 'Content-Type: application/json' \
   -d '{
-  "address": "15NMkQuPg7GE4eiXAed3rUJV8NswipscoBUY22mqZSX46",
-  "type": "contract",
-  "code": "TxContract MyToken(owner: Address, mut remain: U256) {\npub payable fn buy(from: Address, alfAmount: U256) -> () {\nlet tokenAmount = alfAmount * 1000\nassert!(remain >= tokenAmount)\nlet tokenId = selfTokenId!()\ntransferAlf!(from, owner, alfAmount)\ntransferTokenFromSelf!(from, tokenId, tokenAmount)\nremain = remain - tokenAmount\n}\n}",
+  "code": "TxContract MyToken(owner: Address, mut remain: U256) {\npub payable fn buy(from: Address, alfAmount: U256) -> () {\nlet tokenAmount = alfAmount * 1000\nassert!(remain >= tokenAmount)\nlet tokenId = selfTokenId!()\ntransferAlf!(from, owner, alfAmount)\ntransferTokenFromSelf!(from, tokenId, tokenAmount)\nremain = remain - tokenAmount\n}\n}"
+}'
+```
+
+执行上述request后，会返回contract binary code:
+
+```json
+{
+  "code": "0201402c01010204001616011343e82c1702a0011602344db117031600a0001601a7160016031602aba00116022ba101"
+}
+```
+
+下面开始创建unsigned transaction:
+
+```shell
+curl -X 'POST' \
+  'http://127.0.0.1:12973/contracts/build-contract' \
+  -H 'accept: application/json' \
+  -H 'Content-Type: application/json' \
+  -d '{
+  "fromPublicKey": "022ef57a83ccaa8b72f1c7c68b0d784ccf734e4383f9dbd6982c1c271eedd9f402",
+  "code": "0201402c01010204001616011343e82c1702a0011602344db117031600a0001601a7160016031602aba00116022ba101",
+  "gas": 100000,
+  "gasPrice": "100000000000",
   "state": "[@15NMkQuPg7GE4eiXAed3rUJV8NswipscoBUY22mqZSX46,10000000000000000000000000000u]",
   "issueTokenAmount": "10000000000000000000000000000"
 }'
@@ -44,48 +65,18 @@ $ curl -X 'POST' \
 
 这里简单介绍一下上面的几个参数:
 
-* address: 在创建合约时会从这个address向合约transfer一笔数量很小(`dustUtxoAmount`)的**ALPH**，关于`dustUtxoAmount`后面会介绍
-* type: 类型为`contract`或者`script`，`script`可以用于创建和调用合约，这里我们调用的compile接口会为我们生成`script`
+* fromPublicKey: 创建合约的用户public key
 * code: contract source code
 * state: 合约需要的两个初始状态，对应合约代码的两个参数
 * issueTokenAmount: 合约发行token的总数
-
-**NOTE**: 创建合约时会默认向合约transfer数量为`dustUtxoAmount`的**ALPH**，我们完全可以自己写`TxScript`指定需要向合约transfer多少**ALPH**，具体做法可以参考[这里](https://github.com/alephium/alephium/blob/master/app/src/main/scala/org/alephium/app/ServerUtils.scala#L541-L548)。
 
 执行上述request后，会返回类似下面的response:
 
 ```json
 {
-  "code": "01010100000007150040e767b37fb1db1af9c5a56e322c9d92e0f718a6ece581214319db0af62ee95313c1e8d4a51000a21440300201402c01010204001616011343e82c1702a0011602344db117031600a0001601a7160016031602aba00116022ba10114403102040040e767b37fb1db1af9c5a56e322c9d92e0f718a6ece581214319db0af62ee95302c8204fce5e3e2502611000000013c8204fce5e3e25026110000000ae"
-}
-```
-
-这个就是合约`MyToken`的二进制代码了，下面我们开始创建unsigned transaction:
-
-```shell
-$ curl -X 'POST' \
-  'http://127.0.0.1:12973/contracts/build' \
-  -H 'accept: application/json' \
-  -H 'Content-Type: application/json' \
-  -d '{
-  "fromPublicKey": "022ef57a83ccaa8b72f1c7c68b0d784ccf734e4383f9dbd6982c1c271eedd9f402",
-  "code": "01010100000007150040e767b37fb1db1af9c5a56e322c9d92e0f718a6ece581214319db0af62ee95313c1e8d4a51000a21440300201402c01010204001616011343e82c1702a0011602344db117031600a0001601a7160016031602aba00116022ba10114403102040040e767b37fb1db1af9c5a56e322c9d92e0f718a6ece581214319db0af62ee95302c8204fce5e3e2502611000000013c8204fce5e3e25026110000000ae",
-  "gas": 100000
-}'
-```
-
-这里参数分别为:
-
-* fromPublicKey: 当前使用的地址对应的Public Key
-* code: contract binary code
-* gas: 这里我们手动指定了gas，默认的gas对于合约相关的操作可能不够用
-
-执行上述request之后，会返回类似下面的response:
-
-```json
-{
-  "unsignedTx": "010101010100000007150040e767b37fb1db1af9c5a56e322c9d92e0f718a6ece581214319db0af62ee95313c1e8d4a51000a21440300201402c01010204001616011343e82c1702a0011602344db117031600a0001601a7160016031602aba00116022ba10114403102040040e767b37fb1db1af9c5a56e322c9d92e0f718a6ece581214319db0af62ee95302c8204fce5e3e2502611000000013c8204fce5e3e25026110000000ae800186a0c1174876e80001c168f933c229678d1fb71105360abbca47cc00e793439c76bb78fea3b4e97cdc963c983300022ef57a83ccaa8b72f1c7c68b0d784ccf734e4383f9dbd6982c1c271eedd9f40200",
-  "hash": "9999d8638fc458e987bafc1eae311d31e44149d1551398f53af41752868fb0b6",
+  "unsignedTx": "010101010100000007150040e767b37fb1db1af9c5a56e322c9d92e0f718a6ece581214319db0af62ee95313c1e8d4a51000a21440300201402c01010204001616011343e82c1702a0011602344db117031600a0001601a7160016031602aba00116022ba10114403102040040e767b37fb1db1af9c5a56e322c9d92e0f718a6ece581214319db0af62ee95302c8204fce5e3e2502611000000013c8204fce5e3e25026110000000ae800186a0c1174876e80002c168f9330e156dcad570f73323a970080432ac0000a0c39abac91586c1f90dc3a6d373f500022ef57a83ccaa8b72f1c7c68b0d784ccf734e4383f9dbd6982c1c271eedd9f402c168f9338ca37e7cd81c8e3cbd61376586a740efc3751e37333d50654e1df8791a9f066f00022ef57a83ccaa8b72f1c7c68b0d784ccf734e4383f9dbd6982c1c271eedd9f40200",
+  "hash": "189ea4dd5978ac97ec83d0632750bb811dbcb540808908258c28fd155662e00b",
+  "contractId": "c9d105c99b1fb26f213fb80797e76959c137659fb13bd77e935d05d557c59e80",
   "fromGroup": 3,
   "toGroup": 3
 }
@@ -99,7 +90,7 @@ $ curl -X 'POST' \
   -H 'accept: application/json' \
   -H 'Content-Type: application/json' \
   -d '{
-  "data": "9999d8638fc458e987bafc1eae311d31e44149d1551398f53af41752868fb0b6"
+  "data": "189ea4dd5978ac97ec83d0632750bb811dbcb540808908258c28fd155662e00b"
 }'
 ```
 
@@ -107,7 +98,7 @@ $ curl -X 'POST' \
 
 ```json
 {
-  "signature": "96b9e91d77cf9976a3e55162f109fcfb99ad2aa1c2550b3fd3dd3957931231f430a92385984478645452d9de0fb0eda017e327ff026f24f75cda8cfd2d334c36"
+  "signature": "067a8a69c40e850c9895e296cf15a6094d41574c7932bc63a3c7726405f397922910af6f6c478b529d5cc0e7559f133417f8b5ba55e79344e745a6e51d6054d4"
 }
 ```
 
@@ -115,14 +106,12 @@ $ curl -X 'POST' \
 
 ```shell
 $ curl -X 'POST' \
-  'http://127.0.0.1:12973/contracts/submit' \
+  'http://127.0.0.1:12973/transactions/submit' \
   -H 'accept: application/json' \
   -H 'Content-Type: application/json' \
   -d '{
-  "code": "01010100000007150040e767b37fb1db1af9c5a56e322c9d92e0f718a6ece581214319db0af62ee95313c1e8d4a51000a21440300201402c01010204001616011343e82c1702a0011602344db117031600a0001601a7160016031602aba00116022ba10114403102040040e767b37fb1db1af9c5a56e322c9d92e0f718a6ece581214319db0af62ee95302c8204fce5e3e2502611000000013c8204fce5e3e25026110000000ae",
-  "tx": "010101010100000007150040e767b37fb1db1af9c5a56e322c9d92e0f718a6ece581214319db0af62ee95313c1e8d4a51000a21440300201402c01010204001616011343e82c1702a0011602344db117031600a0001601a7160016031602aba00116022ba10114403102040040e767b37fb1db1af9c5a56e322c9d92e0f718a6ece581214319db0af62ee95302c8204fce5e3e2502611000000013c8204fce5e3e25026110000000ae800186a0c1174876e80001c168f933c229678d1fb71105360abbca47cc00e793439c76bb78fea3b4e97cdc963c983300022ef57a83ccaa8b72f1c7c68b0d784ccf734e4383f9dbd6982c1c271eedd9f40200",
-  "signature": "96b9e91d77cf9976a3e55162f109fcfb99ad2aa1c2550b3fd3dd3957931231f430a92385984478645452d9de0fb0eda017e327ff026f24f75cda8cfd2d334c36",
-  "fromGroup": 3
+  "unsignedTx": "010101010100000007150040e767b37fb1db1af9c5a56e322c9d92e0f718a6ece581214319db0af62ee95313c1e8d4a51000a21440300201402c01010204001616011343e82c1702a0011602344db117031600a0001601a7160016031602aba00116022ba10114403102040040e767b37fb1db1af9c5a56e322c9d92e0f718a6ece581214319db0af62ee95302c8204fce5e3e2502611000000013c8204fce5e3e25026110000000ae800186a0c1174876e80002c168f9330e156dcad570f73323a970080432ac0000a0c39abac91586c1f90dc3a6d373f500022ef57a83ccaa8b72f1c7c68b0d784ccf734e4383f9dbd6982c1c271eedd9f402c168f9338ca37e7cd81c8e3cbd61376586a740efc3751e37333d50654e1df8791a9f066f00022ef57a83ccaa8b72f1c7c68b0d784ccf734e4383f9dbd6982c1c271eedd9f40200",
+  "signature": "067a8a69c40e850c9895e296cf15a6094d41574c7932bc63a3c7726405f397922910af6f6c478b529d5cc0e7559f133417f8b5ba55e79344e745a6e51d6054d4"
 }' 
 ```
 
@@ -130,19 +119,19 @@ $ curl -X 'POST' \
 
 ```json
 {
-  "txId": "9999d8638fc458e987bafc1eae311d31e44149d1551398f53af41752868fb0b6",
+  "txId": "189ea4dd5978ac97ec83d0632750bb811dbcb540808908258c28fd155662e00b",
   "fromGroup": 3,
   "toGroup": 3
 }
 ```
 
-这时我们就可以等待tx直到confirmed，我们可以直接在testnet explorer上查看[这笔交易](https://testnet.alephium.org/#/transactions/9999d8638fc458e987bafc1eae311d31e44149d1551398f53af41752868fb0b6)。
+这时我们就可以等待tx直到confirmed，我们可以直接在testnet explorer上查看[这笔交易](https://testnet.alephium.org/#/transactions/189ea4dd5978ac97ec83d0632750bb811dbcb540808908258c28fd155662e00b)。
 
 为了更清楚地了解创建合约的过程，下面我们来看看上述tx的具体内容(目前暂时还没有查看tx详细信息的接口，所以我们这里直接使用获取block的接口，后面我们会提供针对tx的接口):
 
 ```shell
 $ curl -X 'GET' \
-  'http://127.0.0.1:12973/blockflow/blocks/00000042cc6dce61cf6e8beb5d90c1a35fcfb28c9deb8f99e2fd37e669315acf' \
+  'http://127.0.0.1:12973/blockflow/blocks/000000065796124c9950f913e98fcb1a9f15ae937b92419e4f10e05ac6f3474f' \
   -H 'accept: application/json'
 ```
 
@@ -150,29 +139,37 @@ $ curl -X 'GET' \
 
 ```json
 {
-  "hash": "00000042cc6dce61cf6e8beb5d90c1a35fcfb28c9deb8f99e2fd37e669315acf",
-  "timestamp": 1632547455286,
+  "hash": "000000065796124c9950f913e98fcb1a9f15ae937b92419e4f10e05ac6f3474f",
+  "timestamp": 1634954617055,
   "chainFrom": 3,
   "chainTo": 3,
-  "height": 13264,
+  "height": 20871,
   "deps": [
-    "0000005551446a346875eb4db15f5aad291833db18408f9aa0f48cd70cdcb6a0",
-    "000000ec8abe87275f1735e63b3059b20429d4d7eb4ed305ffdee660df7d04c5",
-    "000001275a6c11d3f52148c4eaa24b2f7fc316e5171ade632dae288483b82a3a",
-    "000001cb7cc0245d6f1885ad7012081441e316765d50b198293121fae3b250dc",
-    "000000ff5011e25ec63a12a62a1659aa5dc048cf13dbd61c21c85140dbbe4c5d",
-    "000001ceaf57dc7f8cfce27648729f5c8a14f55a58d122b1a279ce8bf89e1ace",
-    "000001806c6d29d968f88db03193a3d5dd60ed002bc7ea82c182b490738e645f"
+    "00000005608265594fb2e1c1edf7e3c913701ed88e87fefd68c1fb61e152ce90",
+    "00000003177290f7d4afbe01fb64feaf09f42cbd31db6c37a5838aef3982b335",
+    "000000090b07066aeb8c6fa8513101d84cfa87779ff0d75fef5b2bc5cc904b0a",
+    "0000000330143898b3db70c47ac7b4326f148cdf73801e05ec6b60b25ae2a0ac",
+    "000000019310fe3c960922bb23cb873e0fc723dd1fab42d7f9f64765e545732d",
+    "000000071d82202649a568a56ab618c25cefea6f07d6aa11d5e6610b7270b39e",
+    "0000000773419f867842b8b51ecfa76cfa09dca7196415fb13590d1ed3ac6dff"
   ],
   "transactions": [
     {
-      "id": "9999d8638fc458e987bafc1eae311d31e44149d1551398f53af41752868fb0b6",
+      "id": "189ea4dd5978ac97ec83d0632750bb811dbcb540808908258c28fd155662e00b",
       "inputs": [
         {
           "type": "asset",
           "outputRef": {
             "hint": -1050085069,
-            "key": "c229678d1fb71105360abbca47cc00e793439c76bb78fea3b4e97cdc963c9833"
+            "key": "0e156dcad570f73323a970080432ac0000a0c39abac91586c1f90dc3a6d373f5"
+          },
+          "unlockScript": "00022ef57a83ccaa8b72f1c7c68b0d784ccf734e4383f9dbd6982c1c271eedd9f402"
+        },
+        {
+          "type": "asset",
+          "outputRef": {
+            "hint": -1050085069,
+            "key": "8ca37e7cd81c8e3cbd61376586a740efc3751e37333d50654e1df8791a9f066f"
           },
           "unlockScript": "00022ef57a83ccaa8b72f1c7c68b0d784ccf734e4383f9dbd6982c1c271eedd9f402"
         }
@@ -181,17 +178,17 @@ $ curl -X 'GET' \
         {
           "type": "contract",
           "amount": "1000000000000",
-          "address": "288xWaVhT4oKRHB8QSsLp4oZg2YvUNHu2rr8Y3mvegeW2",
+          "address": "28GkvM9xuRB5Ku33ZstXxr81ydWQ8WQoWxNVBsL8StbmR",
           "tokens": [
             {
-              "id": "c7d17b2eebf64b13f66c34d3c65df0aa7720b4ddee8efc342a6051e6e293ff4f",
+              "id": "c9d105c99b1fb26f213fb80797e76959c137659fb13bd77e935d05d557c59e80",
               "amount": "10000000000000000000000000000"
             }
           ]
         },
         {
           "type": "asset",
-          "amount": "26974598000000000000",
+          "amount": "3989999000000000000",
           "address": "15NMkQuPg7GE4eiXAed3rUJV8NswipscoBUY22mqZSX46",
           "tokens": [],
           "lockTime": 0,
@@ -202,16 +199,16 @@ $ curl -X 'GET' \
       "gasPrice": "100000000000"
     },
     {
-      "id": "7abf93fc435eb39c21ee2e7def0d9fdd9b7855d02d2afdddde5e204c0314ade5",
+      "id": "2c4c024f9e992b28cdf57b2be924d3690550e6147c9a64159a7777547f372f2f",
       "inputs": [],
       "outputs": [
         {
           "type": "asset",
-          "amount": "1895069812536239624",
-          "address": "12oxFH1C8JqKCW5Rv9otymoZwsB6grvWP8jGiLcyaHDZW",
+          "amount": "2311101497821509838",
+          "address": "18skQAqJSUbsDgik2pS6HW5tuMGNuCyPYGuHfn3C4S9Q3",
           "tokens": [],
-          "lockTime": 1632548055286,
-          "additionalData": "03030000017c1b694136"
+          "lockTime": 1634955217055,
+          "additionalData": "03030000017caae3a0df"
         }
       ],
       "gasAmount": 20000,
@@ -221,17 +218,25 @@ $ curl -X 'GET' \
 }
 ```
 
-这里我们只关注txId为`9999d8638fc458e987bafc1eae311d31e44149d1551398f53af41752868fb0b6`的交易:
+这里我们只关注txId为`189ea4dd5978ac97ec83d0632750bb811dbcb540808908258c28fd155662e00b`的交易:
 
 ```json
 {
-  "id": "9999d8638fc458e987bafc1eae311d31e44149d1551398f53af41752868fb0b6",
+  "id": "189ea4dd5978ac97ec83d0632750bb811dbcb540808908258c28fd155662e00b",
   "inputs": [
     {
       "type": "asset",
       "outputRef": {
         "hint": -1050085069,
-        "key": "c229678d1fb71105360abbca47cc00e793439c76bb78fea3b4e97cdc963c9833"
+        "key": "0e156dcad570f73323a970080432ac0000a0c39abac91586c1f90dc3a6d373f5"
+      },
+      "unlockScript": "00022ef57a83ccaa8b72f1c7c68b0d784ccf734e4383f9dbd6982c1c271eedd9f402"
+    },
+    {
+      "type": "asset",
+      "outputRef": {
+        "hint": -1050085069,
+        "key": "8ca37e7cd81c8e3cbd61376586a740efc3751e37333d50654e1df8791a9f066f"
       },
       "unlockScript": "00022ef57a83ccaa8b72f1c7c68b0d784ccf734e4383f9dbd6982c1c271eedd9f402"
     }
@@ -240,17 +245,17 @@ $ curl -X 'GET' \
     {
       "type": "contract",
       "amount": "1000000000000",
-      "address": "288xWaVhT4oKRHB8QSsLp4oZg2YvUNHu2rr8Y3mvegeW2",
+      "address": "28GkvM9xuRB5Ku33ZstXxr81ydWQ8WQoWxNVBsL8StbmR",
       "tokens": [
         {
-          "id": "c7d17b2eebf64b13f66c34d3c65df0aa7720b4ddee8efc342a6051e6e293ff4f",
+          "id": "c9d105c99b1fb26f213fb80797e76959c137659fb13bd77e935d05d557c59e80",
           "amount": "10000000000000000000000000000"
         }
       ]
     },
     {
       "type": "asset",
-      "amount": "26974598000000000000",
+      "amount": "3989999000000000000",
       "address": "15NMkQuPg7GE4eiXAed3rUJV8NswipscoBUY22mqZSX46",
       "tokens": [],
       "lockTime": 0,
@@ -262,18 +267,41 @@ $ curl -X 'GET' \
 }
 ```
 
-我们可以看到这笔tx有一个input，两个outputs，第一个output类型为`contract`，下面来解释每个字段:
+我们可以看到这笔tx有一个类型为`contract`的output，下面来解释contract output的每个字段:
 
 * type: tx output的类型，`contract`或者`asset`
-* amount: **ALPH**的数量，我们可以看到这里`1000000000000`为上面说的`dustUtxoAmount`
+* amount: **ALPH**的数量，这里`1000000000000`为创建合约时默认从用户地址转给合约的数量(可以为任意值)
 * address: contract address的base58编码
 * tokens: 其中包括了我们刚刚创建的token amount和token id
 
-第二个output为asset output，跟普通的transfer output类似，区别在于这笔tx的两个output都是合约生成的。
+合约创建成功后，我们可以查看contract state:
 
-这里主要关注创建合约生成的output，后面有时间我会单独介绍tx中每个字段的意义。
+```shell
+$ curl -X 'GET' \
+  'http://127.0.0.1:12973/contracts/28GkvM9xuRB5Ku33ZstXxr81ydWQ8WQoWxNVBsL8StbmR/state?group=3' \
+  -H 'accept: application/json'
+```
 
-合约创建成功后，我们接下来开始调用合约，即通过`MyToken.buy`向合约支付**ALPH**来换取token。
+得到的contract state为:
+
+```json
+{
+  "fields": [
+    {
+      "type": "address",
+      "value": "15NMkQuPg7GE4eiXAed3rUJV8NswipscoBUY22mqZSX46"
+    },
+    {
+      "type": "u256",
+      "value": "10000000000000000000000000000"
+    }
+  ]
+}
+```
+
+我们可以看到contract state即为创建合约时初始化的state
+
+合约创建成功后，我们接下来开始调用合约，即通过`MyToken.buy`向合约支付**ALPH**来换取token
 
 # Call contract
 
@@ -282,9 +310,12 @@ $ curl -X 'GET' \
 ```
 TxScript Main {
   pub payable fn main() -> () {
-    approveAlf!(@1FcFfMU5NmQY4Tj71ApytZpsgAEYLhkX3s4ZWy3PVqVeR, 1000000000000000000)
-    let contract = MyToken(#c7d17b2eebf64b13f66c34d3c65df0aa7720b4ddee8efc342a6051e6e293ff4f)
-    contract.buy(@1FcFfMU5NmQY4Tj71ApytZpsgAEYLhkX3s4ZWy3PVqVeR, 1000000000000000000)
+    let address = @1FcFfMU5NmQY4Tj71ApytZpsgAEYLhkX3s4ZWy3PVqVeR 
+    let amount = 1000000000000000000
+    let contractId = #c9d105c99b1fb26f213fb80797e76959c137659fb13bd77e935d05d557c59e80
+    approveAlf!(address, amount)
+    let contract = MyToken(contractId)
+    contract.buy(address, amount)
   }
 }
 ```
@@ -292,43 +323,41 @@ TxScript Main {
 简单解释一下这一段代码:
 
 * 通过`approveAlf!`授权contract代为支付**ALPH**
-* 通过contract id load需要调用的contract，这里的contract id `c7d17b2eebf64b13f66c34d3c65df0aa7720b4ddee8efc342a6051e6e293ff4f`是通过上述的contract output address计算得来的(decode base58)，后面我们会提供更便捷的方式
-* 调用`MyToken.buy`支付1个**ALPH**来换取token
+* `MyToken(contractId)` 会从world state中加载contract
+* `contract.buy(address, amount)` 会调用`MyToken.buy`
 
 同样，我们需要先编译为二进制代码(需要注意的是这里也要带上被调用的合约代码):
 
 ```shell
 $ curl -X 'POST' \
-  'http://127.0.0.1:12973/contracts/compile' \
+  'http://127.0.0.1:12973/contracts/compile-script' \
   -H 'accept: application/json' \
   -H 'Content-Type: application/json' \
   -d '{
-  "address": "1FcFfMU5NmQY4Tj71ApytZpsgAEYLhkX3s4ZWy3PVqVeR",
-  "type": "script",
-  "code": "TxScript Main {\n pub payable fn main() -> () {\n approveAlf!(@1FcFfMU5NmQY4Tj71ApytZpsgAEYLhkX3s4ZWy3PVqVeR, 1000000000000000000)\n let contract = MyToken(#c7d17b2eebf64b13f66c34d3c65df0aa7720b4ddee8efc342a6051e6e293ff4f)\n contract.buy(@1FcFfMU5NmQY4Tj71ApytZpsgAEYLhkX3s4ZWy3PVqVeR, 1000000000000000000)\n }\n }\n \nTxContract MyToken(owner: Address, mut remain: U256) {\n pub payable fn buy(from: Address, alfAmount: U256) -> () {\n let tokenAmount = alfAmount * 1000\n assert!(remain >= tokenAmount)\n let tokenId = selfTokenId!()\n transferAlf!(from, owner, alfAmount)\n transferTokenFromSelf!(from, tokenId, tokenAmount)\n remain = remain - tokenAmount\n }\n }"
+  "code": "TxScript Main {\n pub payable fn main() -> () {\n let address = @1FcFfMU5NmQY4Tj71ApytZpsgAEYLhkX3s4ZWy3PVqVeR \n let amount = 1000000000000000000\n let contractId = #c9d105c99b1fb26f213fb80797e76959c137659fb13bd77e935d05d557c59e80\n approveAlf!(address, amount)\n let contract = MyToken(contractId)\n contract.buy(address, amount)\n }\n }\n TxContract MyToken(owner: Address, mut remain: U256) {\npub payable fn buy(from: Address, alfAmount: U256) -> () {\nlet tokenAmount = alfAmount * 1000\nassert!(remain >= tokenAmount)\nlet tokenId = selfTokenId!()\ntransferAlf!(from, owner, alfAmount)\ntransferTokenFromSelf!(from, tokenId, tokenAmount)\nremain = remain - tokenAmount\n}\n}"
 }'
 ```
 
-这里我们使用另外一个地址来调用contract，执行上述request后，会返回类似下面的response:
+得到script binary code:
 
 ```json
-response:
 {
-  "code": "010101000100091500d90b85d7ab9aec01def906cb80331a19a7fea1a0fc6fd536b556362a4e405aea13c40de0b6b3a7640000a2144020c7d17b2eebf64b13f66c34d3c65df0aa7720b4ddee8efc342a6051e6e293ff4f17001500d90b85d7ab9aec01def906cb80331a19a7fea1a0fc6fd536b556362a4e405aea13c40de0b6b3a764000016000100"
+  "code": "0101010004000f1500d90b85d7ab9aec01def906cb80331a19a7fea1a0fc6fd536b556362a4e405aea170013c40de0b6b3a76400001701144020c9d105c99b1fb26f213fb80797e76959c137659fb13bd77e935d05d557c59e80170216001601a2160217031600160116030100"
 }
 ```
 
-然后我们根据binary code来创建unsigned tx:
+然后我们根据binary code来创建unsigned tx(这里我们使用新的地址):
 
 ```shell
 $ curl -X 'POST' \
-  'http://127.0.0.1:12973/contracts/build' \
+  'http://127.0.0.1:12973/contracts/build-script' \
   -H 'accept: application/json' \
   -H 'Content-Type: application/json' \
   -d '{
   "fromPublicKey": "02b79c9fc0e442d9c196ef7b09cd1410665396dd30ffc5d05f5b24b816f67d480b",
-  "code": "010101000100091500d90b85d7ab9aec01def906cb80331a19a7fea1a0fc6fd536b556362a4e405aea13c40de0b6b3a7640000a2144020c7d17b2eebf64b13f66c34d3c65df0aa7720b4ddee8efc342a6051e6e293ff4f17001500d90b85d7ab9aec01def906cb80331a19a7fea1a0fc6fd536b556362a4e405aea13c40de0b6b3a764000016000100",
-  "gas": 100000
+  "code": "0101010004000f1500d90b85d7ab9aec01def906cb80331a19a7fea1a0fc6fd536b556362a4e405aea170013c40de0b6b3a76400001701144020c9d105c99b1fb26f213fb80797e76959c137659fb13bd77e935d05d557c59e80170216001601a2160217031600160116030100",
+  "gas": 100000,
+  "gasPrice": "100000000000"
 }'
 ```
 
@@ -336,8 +365,8 @@ $ curl -X 'POST' \
 
 ```json
 {
-  "unsignedTx": "0101010101000100091500d90b85d7ab9aec01def906cb80331a19a7fea1a0fc6fd536b556362a4e405aea13c40de0b6b3a7640000a2144020c7d17b2eebf64b13f66c34d3c65df0aa7720b4ddee8efc342a6051e6e293ff4f17001500d90b85d7ab9aec01def906cb80331a19a7fea1a0fc6fd536b556362a4e405aea13c40de0b6b3a764000016000100800186a0c1174876e800037aa0f6ff04a938b825c1b7bd6784f0d3ef92693fb1b8e9c2dc6710cf13bf4a8b08795ffb0002b79c9fc0e442d9c196ef7b09cd1410665396dd30ffc5d05f5b24b816f67d480b7aa0f6ffb32908ca767650d9e81e6c123f36818e7835803fa43647162bdd863bffd04a8a0002b79c9fc0e442d9c196ef7b09cd1410665396dd30ffc5d05f5b24b816f67d480b7aa0f6ffb849638ad667078d54503b3afaf13251aab2c5d1ad5ef06bd6dd083195091d320002b79c9fc0e442d9c196ef7b09cd1410665396dd30ffc5d05f5b24b816f67d480b00",
-  "hash": "907eac91ff7adb3940eabbe0f850c4978f9e00e35693114d8aff707399aa9086",
+  "unsignedTx": "01010101010004000f1500d90b85d7ab9aec01def906cb80331a19a7fea1a0fc6fd536b556362a4e405aea170013c40de0b6b3a76400001701144020c9d105c99b1fb26f213fb80797e76959c137659fb13bd77e935d05d557c59e80170216001601a2160217031600160116030100800186a0c1174876e800017aa0f6ff37c5bc885bd198d0a6cac7c87b6967b3f23636ff01cdc966b949ea785373c8ed0002b79c9fc0e442d9c196ef7b09cd1410665396dd30ffc5d05f5b24b816f67d480b00",
+  "hash": "df4c3bbad175c38409aefdb9c27046fb04578dfd915625334a95153e11040020",
   "fromGroup": 3,
   "toGroup": 3
 }
@@ -347,7 +376,7 @@ $ curl -X 'POST' \
 
 ```json
 {
-  "signature": "25939e984436deeab57a078a692f3d7f01202a1e1b1ab4963ae623027621954b7e575906348c82b5629f16fc3e2363342d19f08fc021354da8a88e3956b98df2"
+  "signature": "73291f3bcc5083874305c945dd848abdeffc160e5af767d3f875aea1d19e3a7c696150b3073e240d01555957f0a7c9bd5bba5f32e948adb3cad9aa372d0ee1e7"
 }
 ```
 
@@ -355,54 +384,36 @@ $ curl -X 'POST' \
 
 ```shell
 $ curl -X 'POST' \
-  'http://127.0.0.1:12973/contracts/submit' \
+  'http://127.0.0.1:12973/transactions/submit' \
   -H 'accept: application/json' \
   -H 'Content-Type: application/json' \
   -d '{
-  "code": "010101000100091500d90b85d7ab9aec01def906cb80331a19a7fea1a0fc6fd536b556362a4e405aea13c40de0b6b3a7640000a2144020c7d17b2eebf64b13f66c34d3c65df0aa7720b4ddee8efc342a6051e6e293ff4f17001500d90b85d7ab9aec01def906cb80331a19a7fea1a0fc6fd536b556362a4e405aea13c40de0b6b3a764000016000100",
-  "tx": "0101010101000100091500d90b85d7ab9aec01def906cb80331a19a7fea1a0fc6fd536b556362a4e405aea13c40de0b6b3a7640000a2144020c7d17b2eebf64b13f66c34d3c65df0aa7720b4ddee8efc342a6051e6e293ff4f17001500d90b85d7ab9aec01def906cb80331a19a7fea1a0fc6fd536b556362a4e405aea13c40de0b6b3a764000016000100800186a0c1174876e800037aa0f6ff04a938b825c1b7bd6784f0d3ef92693fb1b8e9c2dc6710cf13bf4a8b08795ffb0002b79c9fc0e442d9c196ef7b09cd1410665396dd30ffc5d05f5b24b816f67d480b7aa0f6ffb32908ca767650d9e81e6c123f36818e7835803fa43647162bdd863bffd04a8a0002b79c9fc0e442d9c196ef7b09cd1410665396dd30ffc5d05f5b24b816f67d480b7aa0f6ffb849638ad667078d54503b3afaf13251aab2c5d1ad5ef06bd6dd083195091d320002b79c9fc0e442d9c196ef7b09cd1410665396dd30ffc5d05f5b24b816f67d480b00",
-  "signature": "25939e984436deeab57a078a692f3d7f01202a1e1b1ab4963ae623027621954b7e575906348c82b5629f16fc3e2363342d19f08fc021354da8a88e3956b98df2",
-  "fromGroup": 3
-}'  
+  "unsignedTx": "01010101010004000f1500d90b85d7ab9aec01def906cb80331a19a7fea1a0fc6fd536b556362a4e405aea170013c40de0b6b3a76400001701144020c9d105c99b1fb26f213fb80797e76959c137659fb13bd77e935d05d557c59e80170216001601a2160217031600160116030100800186a0c1174876e800017aa0f6ff37c5bc885bd198d0a6cac7c87b6967b3f23636ff01cdc966b949ea785373c8ed0002b79c9fc0e442d9c196ef7b09cd1410665396dd30ffc5d05f5b24b816f67d480b00",
+  "signature": "73291f3bcc5083874305c945dd848abdeffc160e5af767d3f875aea1d19e3a7c696150b3073e240d01555957f0a7c9bd5bba5f32e948adb3cad9aa372d0ee1e7"
+}' 
 ```
 
-同样，可以在testnet上找到[这笔交易](https://testnet.alephium.org/#/transactions/907eac91ff7adb3940eabbe0f850c4978f9e00e35693114d8aff707399aa9086)。
+同样，可以在testnet上找到[这笔交易](https://testnet.alephium.org/#/transactions/df4c3bbad175c38409aefdb9c27046fb04578dfd915625334a95153e11040020)。
 
 下面我们来看看这笔tx的具体内容:
 
 ```json
 {
-  "id": "907eac91ff7adb3940eabbe0f850c4978f9e00e35693114d8aff707399aa9086",
+  "id": "df4c3bbad175c38409aefdb9c27046fb04578dfd915625334a95153e11040020",
   "inputs": [
     {
       "type": "asset",
       "outputRef": {
         "hint": 2057369343,
-        "key": "04a938b825c1b7bd6784f0d3ef92693fb1b8e9c2dc6710cf13bf4a8b08795ffb"
-      },
-      "unlockScript": "0002b79c9fc0e442d9c196ef7b09cd1410665396dd30ffc5d05f5b24b816f67d480b"
-    },
-    {
-      "type": "asset",
-      "outputRef": {
-        "hint": 2057369343,
-        "key": "b32908ca767650d9e81e6c123f36818e7835803fa43647162bdd863bffd04a8a"
-      },
-      "unlockScript": "0002b79c9fc0e442d9c196ef7b09cd1410665396dd30ffc5d05f5b24b816f67d480b"
-    },
-    {
-      "type": "asset",
-      "outputRef": {
-        "hint": 2057369343,
-        "key": "b849638ad667078d54503b3afaf13251aab2c5d1ad5ef06bd6dd083195091d32"
+        "key": "37c5bc885bd198d0a6cac7c87b6967b3f23636ff01cdc966b949ea785373c8ed"
       },
       "unlockScript": "0002b79c9fc0e442d9c196ef7b09cd1410665396dd30ffc5d05f5b24b816f67d480b"
     },
     {
       "type": "contract",
       "outputRef": {
-        "hint": 1829167778,
-        "key": "c7d17b2eebf64b13f66c34d3c65df0aa7720b4ddee8efc342a6051e6e293ff4f"
+        "hint": -425827896,
+        "key": "c9d105c99b1fb26f213fb80797e76959c137659fb13bd77e935d05d557c59e80"
       }
     }
   ],
@@ -417,11 +428,11 @@ $ curl -X 'POST' \
     },
     {
       "type": "asset",
-      "amount": "4990000000000000000",
+      "amount": "990000000000000000",
       "address": "1FcFfMU5NmQY4Tj71ApytZpsgAEYLhkX3s4ZWy3PVqVeR",
       "tokens": [
         {
-          "id": "c7d17b2eebf64b13f66c34d3c65df0aa7720b4ddee8efc342a6051e6e293ff4f",
+          "id": "c9d105c99b1fb26f213fb80797e76959c137659fb13bd77e935d05d557c59e80",
           "amount": "1000000000000000000000"
         }
       ],
@@ -431,10 +442,10 @@ $ curl -X 'POST' \
     {
       "type": "contract",
       "amount": "1000000000000",
-      "address": "288xWaVhT4oKRHB8QSsLp4oZg2YvUNHu2rr8Y3mvegeW2",
+      "address": "28GkvM9xuRB5Ku33ZstXxr81ydWQ8WQoWxNVBsL8StbmR",
       "tokens": [
         {
-          "id": "c7d17b2eebf64b13f66c34d3c65df0aa7720b4ddee8efc342a6051e6e293ff4f",
+          "id": "c9d105c99b1fb26f213fb80797e76959c137659fb13bd77e935d05d557c59e80",
           "amount": "9999999000000000000000000000"
         }
       ]
@@ -451,8 +462,8 @@ $ curl -X 'POST' \
 {
   "type": "contract",
   "outputRef": {
-    "hint": 1829167778,
-    "key": "c7d17b2eebf64b13f66c34d3c65df0aa7720b4ddee8efc342a6051e6e293ff4f"
+    "hint": -425827896,
+    "key": "c9d105c99b1fb26f213fb80797e76959c137659fb13bd77e935d05d557c59e80"
   }
 }
 ```
@@ -477,11 +488,11 @@ $ curl -X 'POST' \
 ```json
 {
   "type": "asset",
-  "amount": "4990000000000000000",
+  "amount": "990000000000000000",
   "address": "1FcFfMU5NmQY4Tj71ApytZpsgAEYLhkX3s4ZWy3PVqVeR",
   "tokens": [
     {
-      "id": "c7d17b2eebf64b13f66c34d3c65df0aa7720b4ddee8efc342a6051e6e293ff4f",
+      "id": "c9d105c99b1fb26f213fb80797e76959c137659fb13bd77e935d05d557c59e80",
       "amount": "1000000000000000000000"
     }
   ],
@@ -498,10 +509,10 @@ $ curl -X 'POST' \
 {
   "type": "contract",
   "amount": "1000000000000",
-  "address": "288xWaVhT4oKRHB8QSsLp4oZg2YvUNHu2rr8Y3mvegeW2",
+  "address": "28GkvM9xuRB5Ku33ZstXxr81ydWQ8WQoWxNVBsL8StbmR",
   "tokens": [
     {
-      "id": "c7d17b2eebf64b13f66c34d3c65df0aa7720b4ddee8efc342a6051e6e293ff4f",
+      "id": "c9d105c99b1fb26f213fb80797e76959c137659fb13bd77e935d05d557c59e80",
       "amount": "9999999000000000000000000000"
     }
   ]
@@ -509,6 +520,25 @@ $ curl -X 'POST' \
 ```
 
 这里我们可以看到，contract output的token数量从原来的`10000000000000000000000000000`变为现在的`9999999000000000000000000000`，少的数量刚好是我们兑换的token数量。
+
+同样，我们可以再次查看contract state，得到的结果为:
+
+```json
+{
+  "fields": [
+    {
+      "type": "address",
+      "value": "15NMkQuPg7GE4eiXAed3rUJV8NswipscoBUY22mqZSX46"
+    },
+    {
+      "type": "u256",
+      "value": "9999999000000000000000000000"
+    }
+  ]
+}
+```
+
+我们可以看到token数量发生了变化
 
 # Contract state
 
@@ -543,27 +573,13 @@ final case class ContractState private (
 * 合约执行时涉及到修改合约状态时会更新WorldState中的合约状态
 * 如果合约生成新的contract output，会更新合约状态中的`contractOutputRef`，同时删除老的contract output
 
-我们以`MyToken`合约为例，来看看合约状态的变更，目前还没有提供直接读取合约状态的接口，所以这里我直接从WorldState中读取`MyToken`的状态数据:
-
-```
-创建合约后的状态:
-fields: Iterable(Address(P2PKH(Blake2b(hex"40e767b37fb1db1af9c5a56e322c9d92e0f718a6ece581214319db0af62ee953"))), U256(10000000000000000000000000000))
-contractOutputRef: ContractOutputRef(Hint(1829167778),Blake2b(hex"c7d17b2eebf64b13f66c34d3c65df0aa7720b4ddee8efc342a6051e6e293ff4f"))
-
-调用合约后的状态:
-fields: Iterable(Address(P2PKH(Blake2b(hex"40e767b37fb1db1af9c5a56e322c9d92e0f718a6ece581214319db0af62ee953"))), U256(9999999000000000000000000000))
-contractOutputRef: ContractOutputRef(Hint(1829167778),Blake2b(hex"5e00b698308b49768e9137e710a0ed57ff96a083a573e53d5aa81478d5c93878"))
-```
-
-这里我们可以看到，调用`MyToken.buy`之后，`remain`及`contractOutputRef`都发生了变化。
-
-不同于[eUTXO](https://iohk.io/en/research/library/papers/the-extended-utxo-model/)，在eUTXO中合约的状态也是保存在contract output中，这就导致了cardano上经常提到的[concurrency issue](https://iohk.io/en/blog/posts/2021/09/10/concurrency-and-all-that-cardano-smart-contracts-and-the-eutxo-model/)。alephium的stateful UTXO不仅避免了concurrency issue，而且迁移ETH合约也会变得简单很多。
+对比上述合约调用前后的contract state可以发现调用`MyToken.buy`之后，`remain`及`contractOutputRef`都发生了变化。
 
 另外简单说下在创建和调用合约时可能遇到的错误及解决办法:
 
 * NotEnoughBalance: 这个只能通过mining获取奖励或者别人转账来解决
 * OutOfGas: 默认的gas比较小，创建和调用合约时通常不够用，所以在创建unsigned tx时一般要手动指定消耗的gas
-* AmountIsDustOrZero: 为了避免遭受到攻击，系统会拒绝amount过于小的output，如果想要了解更多可以参考[这里](https://github.com/alephium/alephium/wiki/On-dust-outputs-and-state-explosion)
+* InvalidOutputStats: 为了避免遭受到攻击，系统会拒绝amount过于小的output，如果想要了解更多可以参考[这里](https://github.com/alephium/alephium/wiki/On-dust-outputs-and-state-explosion)
 
-感兴趣的同学可以尝试在testnet上创建合约，将ETH应用迁移到alephium上来。
+感兴趣的同学可以尝试在testnet上创建合约，将ETH应用迁移到alephium上来
 
