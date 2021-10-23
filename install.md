@@ -14,7 +14,7 @@ $ source "$HOME/.sdkman/bin/sdkman-init.sh"
 $ sdk install java 11.0.11.hs-adpt
 ```
 
-接下来我们从[alephium release](https://github.com/alephium/alephium/releases)页面上下载最新版本(当前最新版本为0.10.0)，下载完成功后开始创建配置文件:
+接下来我们从[alephium release](https://github.com/alephium/alephium/releases)页面上下载最新版本(当前最新版本为0.11.3)，下载完成功后开始创建配置文件:
 
 ```sh
 $ cd; mkdir .alephium; cd .alephium
@@ -29,8 +29,8 @@ $ echo "alephium.network.network-id = 10\nalephium.discovery.bootstrap = []\n" >
 下面我们就可以直接运行alephium full node了:
 
 ```sh
-$ 切换到之前下载的`alephium-0.10.0.jar`目录下
-$ java -jar -Xmx500m alephium-0.10.0.jar
+$ 切换到之前下载的`alephium-0.11.3.jar`目录下
+$ java -jar -Xmx500m alephium-0.11.3.jar
 ```
 
 当看到类似下面的信息时表明节点已经运行起来了:
@@ -47,7 +47,7 @@ $ java -jar -Xmx500m alephium-0.10.0.jar
 2021-09-12 13:27:41,604 [dispatcher-12] INFO  o.a.f.n.CliqueManager                  - Intra clique manager is ready
 2021-09-12 13:27:41,608 [dispatcher-11] INFO  o.a.f.n.TcpController                  - Node bound to /0:0:0:0:0:0:0:0:9973
 2021-09-12 13:27:41,614 [dispatcher-11] INFO  o.a.f.n.DiscoveryServer                - UDP server bound to /0.0.0.0:9973
-2021-09-12 13:27:41,637 [main]          INFO  o.a.app.BootUp                         - Build info: name: alephium-app, scalaVersion: 2.13.5, sbtVersion: 1.3.10, commitId: 5bb6610cd0118f6407dab5364baebea2282275a0, branch: 5bb6610cd0118f6407dab5364baebea2282275a0, releaseVersion: 0.10.0
+2021-09-12 13:27:41,637 [main]          INFO  o.a.app.BootUp                         - Build info: name: alephium-app, scalaVersion: 2.13.5, sbtVersion: 1.3.10, commitId: 5bb6610cd0118f6407dab5364baebea2282275a0, branch: 5bb6610cd0118f6407dab5364baebea2282275a0, releaseVersion: 0.11.3
 2021-09-12 13:27:41,641 [main]          INFO  o.a.app.BootUp                         - Genesis digests: 028ca2f0-2ece6961-fbef2de2-0c4e2f73-1f8342a4-304417d5-c43d6e06-be5e5d67-cc0289d8-61cd2bc9-99bbaa6a-a12f0ceb-6a1fec4c-a26f079d-f8531fbe-06dbf8af
 2021-09-12 13:27:42,613 [ext-global-59] INFO  o.a.a.WebSocketServer                  - Listening ws request on 11973
 2021-09-12 13:27:42,613 [ext-global-55] INFO  o.a.app.RestServer                     - Listening http request on 12973
